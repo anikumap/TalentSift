@@ -1,0 +1,4 @@
+# Keep LF line endings in the repo, even when committing from Windows.
+* text=auto eol=lf
+*.png binary
+*.pdf binary
