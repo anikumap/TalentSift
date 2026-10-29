@@ -1,1 +1,171 @@
+@import "@fontsource-variable/public-sans";
 @import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --paper: #f5f7f8;
+  --surface: #ffffff;
+  --surface-2: #eef2f3;
+  --ink: #15232b;
+  --ink-2: #4a5b64;
+  --ink-3: #7a8a92;
+  --line: #dde4e7;
+  --primary: #0d5c63;
+  --primary-hover: #0a4a50;
+  --primary-soft: #e3f0f0;
+  --on-primary: #ffffff;
+  --marigold: #f2b33d;
+  --marigold-soft: rgba(242, 179, 61, 0.32);
+  --attention: #9a6410;
+  --attention-soft: #fbf0db;
+  --reject: #9e4236;
+  --reject-soft: #f7e6e3;
+  --ok: #2b7149;
+  --ok-soft: #e2f1e8;
+  --focus: #1b8a94;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1a20;
+    --surface: #16242c;
+    --surface-2: #1d2e37;
+    --ink: #e6eef1;
+    --ink-2: #a9bac2;
+    --ink-3: #7d9099;
+    --line: #2a3d47;
+    --primary: #52b4ba;
+    --primary-hover: #6fc6cc;
+    --primary-soft: #183a3f;
+    --on-primary: #0b1a1e;
+    --marigold: #f2b33d;
+    --marigold-soft: rgba(242, 179, 61, 0.24);
+    --attention: #f0c06a;
+    --attention-soft: #3a2e17;
+    --reject: #e58b7e;
+    --reject-soft: #3d2220;
+    --ok: #79c99a;
+    --ok-soft: #173326;
+    --focus: #6fc6cc;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #0f1a20;
+  --surface: #16242c;
+  --surface-2: #1d2e37;
+  --ink: #e6eef1;
+  --ink-2: #a9bac2;
+  --ink-3: #7d9099;
+  --line: #2a3d47;
+  --primary: #52b4ba;
+  --primary-hover: #6fc6cc;
+  --primary-soft: #183a3f;
+  --on-primary: #0b1a1e;
+  --marigold-soft: rgba(242, 179, 61, 0.24);
+  --attention: #f0c06a;
+  --attention-soft: #3a2e17;
+  --reject: #e58b7e;
+  --reject-soft: #3d2220;
+  --ok: #79c99a;
+  --ok-soft: #173326;
+  --focus: #6fc6cc;
+}
+
+@theme inline {
+  --font-sans: "Public Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-on-primary: var(--on-primary);
+  --color-marigold: var(--marigold);
+  --color-attention: var(--attention);
+  --color-attention-soft: var(--attention-soft);
+  --color-reject: var(--reject);
+  --color-reject-soft: var(--reject-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--paper);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The one bold element: quoted candidate evidence, underlined like a highlighter stroke. */
+.evidence {
+  background-image: linear-gradient(transparent 58%, var(--marigold-soft) 58%, var(--marigold-soft) 92%, transparent 92%);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 0 2px;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 h-9 text-sm font-semibold whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+}
+@utility btn-primary {
+  @apply btn bg-primary text-on-primary hover:bg-primary-hover;
+}
+@utility btn-secondary {
+  @apply btn bg-surface text-ink border border-line hover:bg-surface-2;
+}
+@utility btn-ghost {
+  @apply btn text-ink-2 hover:bg-surface-2 hover:text-ink;
+}
+@utility btn-danger {
+  @apply btn bg-surface text-reject border border-line hover:bg-reject-soft;
+}
+@utility btn-lg {
+  @apply h-12 px-5 text-base rounded-lg;
+}
+@utility field {
+  @apply w-full rounded-md border border-line bg-surface px-3 py-2 text-ink placeholder:text-ink-3 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary-soft;
+}
+@utility label {
+  @apply block text-sm font-semibold text-ink mb-1;
+}
+@utility hint {
+  @apply text-sm text-ink-3;
+}
+@utility panel {
+  @apply rounded-lg border border-line bg-surface;
+}
+@utility error-text {
+  @apply text-sm text-reject mt-1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

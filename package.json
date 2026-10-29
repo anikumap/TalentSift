@@ -21,11 +21,13 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@fontsource-variable/public-sans": "^5.3.0",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "next": "^15.5.28",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "server-only": "^0.0.1",
     "unpdf": "^2.0.0",
     "zod": "^4.6.7"
   },
