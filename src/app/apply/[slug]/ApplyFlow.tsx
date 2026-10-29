@@ -28,9 +28,12 @@ export function ApplyFlow({ slug, job }: { slug: string; job: Job }) {
   const [submitting, setSubmitting] = useState(false);
   const [publicRef, setPublicRef] = useState<string>();
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const mounted = useRef(false);
 
+  // Move focus to the new step's heading for screen readers — but not on first load.
   useEffect(() => {
-    headingRef.current?.focus();
+    if (mounted.current) headingRef.current?.focus();
+    mounted.current = true;
   }, [step, publicRef]);
 
   function validate(): Record<string, string> {

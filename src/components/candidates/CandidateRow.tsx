@@ -8,7 +8,7 @@ export function CandidateRow({ row, rank, canDecide }: { row: ShortlistRow; rank
   return (
     <li>
       <details className="group">
-        <summary className="grid cursor-pointer list-none grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-2 px-4 py-3 hover:bg-surface-2 md:grid-cols-[2rem_minmax(160px,1.2fr)_5rem_minmax(220px,2fr)_auto] [&::-webkit-details-marker]:hidden">
+        <summary className="grid cursor-pointer list-none grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-2 px-4 py-3 hover:bg-surface-2 md:grid-cols-[2rem_minmax(160px,1.2fr)_5.5rem_minmax(220px,2fr)_4.5rem] [&::-webkit-details-marker]:hidden">
           <span className="tnum hidden text-sm text-ink-3 md:block">{rank ?? ""}</span>
           <span className="min-w-0">
             <span className="block truncate font-semibold">{row.displayName}</span>
