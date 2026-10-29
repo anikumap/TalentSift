@@ -4,6 +4,7 @@ import { createJobFromIntake, publishJob, getJob } from "@/services/jobs";
 import { submitApplication } from "@/services/applications";
 import { getBilling, startCheckout, confirmCheckout } from "@/services/billing";
 import { getDashboard, listAudit, listOutbox } from "@/services/dashboard";
+import { inviteMember } from "@/services/auth";
 import { resetDb } from "../setup/db";
 import { addMember, caregiverIntake, makeAdmin } from "../setup/fixtures";
 
@@ -99,5 +100,19 @@ describe("dashboard service", () => {
     const other = await makeAdmin("Other");
     expect(await listOutbox(admin)).toHaveLength(1);
     expect(await listOutbox(other)).toHaveLength(0);
+  });
+
+  it("hides team invite links from non-admins so they can't claim the invited role", async () => {
+    const admin = await makeAdmin();
+    const recruiter = await addMember(admin, "RECRUITER");
+    await inviteMember(admin, { email: "boss@test.dev", role: "ADMIN" });
+    expect((await listOutbox(admin)).map((m) => m.kind)).toContain("INVITE_MEMBER");
+    expect(await listOutbox(recruiter)).toHaveLength(0);
+  });
+
+  it("keeps candidate emails away from interviewers", async () => {
+    const admin = await makeAdmin();
+    const interviewer = await addMember(admin, "INTERVIEWER");
+    await expect(listOutbox(interviewer)).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

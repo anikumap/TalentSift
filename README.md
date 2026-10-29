@@ -2,7 +2,7 @@
 
 Evidence-based hiring for hourly roles (home care, logistics, retail). A hiring manager describes a role in a short chat, applicants answer real job situations on their phone, and the team gets a ranked shortlist with quoted evidence. Names stay hidden until a person decides to shortlist someone.
 
-This is the foundation and the Phase 1 MVP.
+This is the foundation and the Phase 1 MVP. Built with Next.js 15, React 19, TypeScript, Prisma (SQLite) and Tailwind CSS 4, tested with Vitest and Playwright.
 
 ## Run it
 
@@ -16,7 +16,9 @@ npm run seed                  # optional demo data
 npm run dev                   # http://localhost:3000
 ```
 
-Demo login after seeding: `admin@demo.test` / `demo1234`.
+Demo login after seeding: `admin@demo.test` / `demo1234`. The seed script refuses to run when `NODE_ENV=production`.
+
+Billing and email are mocks for now: checkout is a fake "pay" page and emails land in the in-app Outbox. A production build (`npm start`) refuses to use them unless you set `ALLOW_MOCK_PROVIDERS=true`, so a real deployment can't hand out free plans by accident.
 
 ## Test it
 
@@ -50,6 +52,17 @@ The first time you run e2e, install the browser with `npx playwright install chr
 - No automatic rejections: only a logged-in person can change a stage, and rejection requires a reason.
 - Every score, stage change, reveal, scorecard edit, publish and plan change is written to an append-only audit log.
 - Candidate text is treated as data. Prompt-injection attempts are flagged for the reviewer and never change the score.
+
+## Security
+
+- Every query is scoped to the signed-in user's organisation, and role checks (Admin, Recruiter, Hiring Manager, Interviewer) run in the service layer, not just the UI.
+- Sessions are random tokens stored only as SHA-256 hashes, in an `httpOnly`, `SameSite=Lax` cookie that is `Secure` when `APP_URL` is https. Passwords use bcrypt.
+- Rate limits: 10 login attempts per account per 15 minutes, 10 sign-ups and 30 applications per IP per hour. Login takes the same time whether or not the email exists.
+- Per-request nonce Content-Security-Policy (`src/middleware.ts`), plus `X-Frame-Options`, `nosniff`, `Referrer-Policy: same-origin` (invite and checkout links carry secrets), HSTS and a locked-down `Permissions-Policy`.
+- The Outbox shows candidate emails only to roles that make decisions, and team-invite links only to admins.
+- Resume uploads are capped at 5 MB and refused before they're read into memory.
+
+Before deploying: serve over HTTPS behind a proxy that sets `X-Forwarded-For`, generate a fresh `ENCRYPTION_KEY`, and keep the database file outside the web root. Rate limits live in memory, so move them to a shared store before running more than one instance.
 
 ## Layout
 

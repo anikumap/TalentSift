@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AppError, HTTP_STATUS } from "@/lib/errors";
+import { allow, clientIp } from "@/lib/rateLimit";
 import { submitApplication } from "@/services/applications";
 
 function parseJson<T>(value: FormDataEntryValue | null, fallback: T): T {
@@ -13,6 +14,14 @@ function parseJson<T>(value: FormDataEntryValue | null, fallback: T): T {
 
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  // Resume limit is 5 MB; refuse anything far larger before buffering it in memory.
+  if (Number(req.headers.get("content-length") ?? 0) > 6 * 1024 * 1024) {
+    return NextResponse.json({ error: "That upload is too large. Resumes must be 5 MB or smaller." }, { status: 413 });
+  }
+  // Generous enough for a shared phone or cyber café, tight enough to stop scripted floods.
+  if (!allow(`apply:${clientIp(req.headers)}`, 30, 60 * 60_000)) {
+    return NextResponse.json({ error: "Too many applications from this connection. Please try again in an hour." }, { status: 429 });
+  }
   let form: FormData;
   try {
     form = await req.formData();

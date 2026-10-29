@@ -7,3 +7,6 @@ test-results/
 playwright-report/
 uploads/
 next-env.d.ts
+tsconfig.tsbuildinfo
+.claude/
+*.tmp.mjs

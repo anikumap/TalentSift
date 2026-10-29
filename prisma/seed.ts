@@ -94,6 +94,9 @@ async function apply(slug: string, answers: string[], i: number, missMustHaves =
 }
 
 async function main() {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(`Refusing to seed in production: it creates ${DEMO_EMAIL} with a publicly known password.`);
+  }
   const existing = await db.user.findUnique({ where: { email: DEMO_EMAIL } });
   if (existing) await db.organization.delete({ where: { id: existing.orgId } });
 

@@ -15,7 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/dashboard", label: "Dashboard" },
     { href: "/jobs", label: "Jobs" },
     { href: "/candidates", label: "Candidates" },
-    { href: "/outbox", label: "Outbox" },
+    ...(can(actor.role, "stage.change") ? [{ href: "/outbox", label: "Outbox" }] : []),
     ...(can(actor.role, "org.admin")
       ? [
           { href: "/settings/team", label: "Team" },

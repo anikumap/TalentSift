@@ -2,7 +2,7 @@
 import { execSync, spawn } from "node:child_process";
 import { rmSync } from "node:fs";
 
-const env = { ...process.env, DATABASE_URL: "file:./e2e.db", APP_URL: "http://localhost:3100" };
+const env = { ...process.env, DATABASE_URL: "file:./e2e.db", APP_URL: "http://localhost:3100", ALLOW_MOCK_PROVIDERS: "true" };
 for (const f of ["prisma/e2e.db", "prisma/e2e.db-journal"]) rmSync(f, { force: true });
 
 execSync("npx prisma db push --skip-generate", { env, stdio: "inherit" });

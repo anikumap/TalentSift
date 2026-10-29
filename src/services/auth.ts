@@ -45,10 +45,13 @@ export async function signup(input: z.input<typeof signupSchema>): Promise<Actor
   return toActor(user);
 }
 
+// Compared against when the email is unknown, so response time doesn't reveal which emails have accounts.
+const DUMMY_HASH = bcrypt.hashSync("not-a-real-password", 10);
+
 export async function login(emailInput: string, pw: string): Promise<Actor | null> {
   const user = await db.user.findUnique({ where: { email: emailInput.trim().toLowerCase() } });
-  if (!user || !(await bcrypt.compare(pw, user.passwordHash))) return null;
-  return toActor(user);
+  const ok = await bcrypt.compare(pw, user?.passwordHash ?? DUMMY_HASH);
+  return user && ok ? toActor(user) : null;
 }
 
 export async function createSession(userId: string): Promise<string> {

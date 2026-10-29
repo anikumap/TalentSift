@@ -2,12 +2,17 @@
 
 import { redirect } from "next/navigation";
 import { runAction, str, type ActionState } from "@/lib/action";
+import { allow, clear, clientIp } from "@/lib/rateLimit";
+import { headers } from "next/headers";
 import { requireActor, setSessionCookie, clearSessionCookie } from "@/lib/session";
 import { acceptInvite, createSession, destroySession, inviteMember, login, signup } from "@/services/auth";
 import type { Role } from "@/domain/constants";
 import { revalidatePath } from "next/cache";
 
 export async function signupAction(_: ActionState, form: FormData): Promise<ActionState> {
+  if (!allow(`signup:${clientIp(await headers())}`, 10,60 * 60_000)) {
+    return { error: "Too many sign-ups from this connection. Please try again in an hour." };
+  }
   const result = await runAction(async () => {
     const actor = await signup({
       orgName: str(form, "orgName"),
@@ -22,8 +27,13 @@ export async function signupAction(_: ActionState, form: FormData): Promise<Acti
 }
 
 export async function loginAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const limitKey = `login:${str(form, "email").trim().toLowerCase()}`;
+  if (!allow(limitKey, 10, 15 * 60_000)) {
+    return { error: "Too many attempts for this account. Please wait 15 minutes and try again." };
+  }
   const actor = await login(str(form, "email"), str(form, "password"));
   if (!actor) return { error: "That email and password don't match an account." };
+  clear(limitKey);
   await setSessionCookie(await createSession(actor.id));
   redirect("/dashboard");
 }

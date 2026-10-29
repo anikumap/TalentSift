@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { requireActor } from "@/lib/session";
+import { can } from "@/lib/rbac";
 import { dateTime } from "@/lib/format";
 import { listOutbox } from "@/services/dashboard";
 import { EmptyState, PageHeader } from "@/components/ui";
@@ -13,6 +15,7 @@ const KIND: Record<string, string> = {
 
 export default async function OutboxPage() {
   const actor = await requireActor();
+  if (!can(actor.role, "stage.change")) redirect("/dashboard");
   const messages = await listOutbox(actor);
   return (
     <>

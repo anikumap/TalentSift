@@ -23,6 +23,10 @@ export function decrypt(enc: string): string {
   return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
 }
 
+export function hmac(data: string): string {
+  return createHmac("sha256", key()).update(data).digest("hex");
+}
+
 export function hashEmail(email: string): string {
-  return createHmac("sha256", key()).update(email.trim().toLowerCase()).digest("hex");
+  return hmac(email.trim().toLowerCase());
 }

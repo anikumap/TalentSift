@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { assertCan, type Actor } from "@/lib/rbac";
+import { assertCan, can, type Actor } from "@/lib/rbac";
 import { AUDIT_ACTIONS, type AuditAction } from "@/domain/constants";
 
 const DAY = 86_400_000;
@@ -53,6 +53,10 @@ export async function listAudit(actor: Actor, filters: { jobId?: string; action?
 }
 
 export async function listOutbox(actor: Actor) {
-  assertCan(actor, "candidate.view");
-  return db.message.findMany({ where: { orgId: actor.orgId }, orderBy: { createdAt: "desc" }, take: 200 });
+  // Emails name candidates (even rejected ones never revealed on the shortlist), so only the
+  // roles that send them may read them.
+  assertCan(actor, "stage.change");
+  // Team invites carry a live sign-up link; anyone holding it can claim the invited role.
+  const kind = can(actor.role, "org.admin") ? undefined : { not: "INVITE_MEMBER" };
+  return db.message.findMany({ where: { orgId: actor.orgId, kind }, orderBy: { createdAt: "desc" }, take: 200 });
 }
