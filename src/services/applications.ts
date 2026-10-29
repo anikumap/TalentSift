@@ -16,7 +16,7 @@ import { extractResumeText, RESUME_MAX_BYTES, RESUME_TYPES, resumeExtension } fr
 export const ANSWER_MAX = 1000;
 
 const applicationSchema = z.object({
-  consent: z.literal(true, { errorMap: () => ({ message: "Please agree to how we use your information" }) }),
+  consent: z.literal(true, { message: "Please agree to how we use your information" }),
   name: z.string().trim().min(2, "Enter your full name").max(120),
   email: z.string().trim().toLowerCase().email("Enter a valid email address"),
   phone: z
@@ -24,8 +24,8 @@ const applicationSchema = z.object({
     .trim()
     .regex(/^[+\d][\d\s\-()]{7,19}$/, "Enter a valid phone number"),
   city: z.string().trim().min(2, "Enter your city").max(80),
-  mustHaveAnswers: z.record(z.boolean()).default({}),
-  answers: z.record(z.string().max(ANSWER_MAX, `Keep each answer under ${ANSWER_MAX} characters`)).default({}),
+  mustHaveAnswers: z.record(z.string(), z.boolean()).default({}),
+  answers: z.record(z.string(), z.string().max(ANSWER_MAX, `Keep each answer under ${ANSWER_MAX} characters`)).default({}),
   resume: z
     .object({ filename: z.string().max(200), bytes: z.instanceof(Buffer) })
     .refine((r) => RESUME_TYPES.includes(resumeExtension(r.filename)), "Resume must be a PDF or .txt file")

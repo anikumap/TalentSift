@@ -10,7 +10,7 @@ import { audit } from "./audit";
 import { inviteEmail, rejectionEmail } from "./emails";
 
 const reasonSchema = z.object({
-  code: z.enum(REJECT_REASONS, { errorMap: () => ({ message: "Choose a reason from the list" }) }),
+  code: z.enum(REJECT_REASONS, { message: "Choose a reason from the list" }),
   note: z.string().trim().max(500).optional(),
 });
 
