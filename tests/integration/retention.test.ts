@@ -104,6 +104,22 @@ describe("retention service", () => {
     expect(await db.auditEvent.count({ where: { entityId: app.id } })).toBe(before);
   });
 
+  it("strips free-text decision notes from the erased candidates' audit history, keeping reason codes", async () => {
+    const gone = await applyAged(job, "old@x.com", 400);
+    const kept = await applyAged(job, "new@x.com", 1);
+    await changeStage(admin, gone.id, "REJECTED", { code: "Other", note: "Meena said she moved to Nagpur" });
+    await changeStage(admin, kept.id, "REJECTED", { code: "Other", note: "Asha is overqualified" });
+    await db.$executeRaw`UPDATE "Application" SET "updatedAt" = ${daysAgo(400)} WHERE "id" = ${gone.id}`;
+
+    await purgeExpired(NOW);
+    const goneEv = await db.auditEvent.findFirstOrThrow({ where: { entityId: gone.id, action: "STAGE_CHANGED" } });
+    const keptEv = await db.auditEvent.findFirstOrThrow({ where: { entityId: kept.id, action: "STAGE_CHANGED" } });
+    expect(goneEv.reason).toBe("Other");
+    expect(keptEv.reason).toBe("Other — Asha is overqualified");
+    const all = await db.auditEvent.findMany({ where: { entityId: gone.id } });
+    expect(JSON.stringify(all)).not.toMatch(/Meena|Nagpur/);
+  });
+
   it("erases nothing and writes nothing on a second run", async () => {
     await applyAged(job, "old@x.com", 400);
     await purgeExpired(NOW);

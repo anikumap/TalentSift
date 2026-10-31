@@ -2,7 +2,8 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { assertCan, type Actor } from "@/lib/rbac";
-import { RETENTION_MAX_DAYS, RETENTION_MIN_DAYS, retentionCutoff } from "@/domain/retention";
+import { RETENTION_MAX_DAYS, RETENTION_MIN_DAYS, retentionCutoff, stripNote } from "@/domain/retention";
+import { REJECT_REASONS } from "@/domain/constants";
 import { audit } from "./audit";
 
 export type PurgeResult = { orgId: string; candidates: number; applications: number; messages: number; cutoff: Date };
@@ -41,7 +42,16 @@ async function purgeOrg(org: Org, now: Date, actor?: Actor): Promise<PurgeResult
   return db.$transaction(async (tx) => {
     const { ids, ...result } = await countExpired(tx, org, now);
     if (result.candidates === 0 && result.messages === 0) return result;
-    // Applications and evaluations cascade from the candidate. Audit events hold no personal data and stay.
+    // Applications and evaluations cascade from the candidate. Audit events stay, but decision notes are
+    // recruiter free text that may name the person, so only the reason code is kept.
+    const appIds = (await tx.application.findMany({ where: { candidateId: { in: ids } }, select: { id: true } })).map((a) => a.id);
+    const noted = appIds.length
+      ? await tx.auditEvent.findMany({ where: { action: "STAGE_CHANGED", entityId: { in: appIds }, reason: { not: null } }, select: { id: true, reason: true } })
+      : [];
+    for (const ev of noted) {
+      const stripped = stripNote(ev.reason, REJECT_REASONS);
+      if (stripped !== ev.reason) await tx.auditEvent.update({ where: { id: ev.id }, data: { reason: stripped } });
+    }
     await tx.candidate.deleteMany({ where: { id: { in: ids } } });
     await tx.message.deleteMany({ where: expiredMessages(org.id, result.cutoff) });
     await audit(tx, {

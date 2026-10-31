@@ -91,7 +91,7 @@ tests/          unit, integration and e2e
 
 ## Data retention
 
-Each organisation keeps candidate data for a set period (default 365 days, adjustable from 30 days to 3 years under **Settings → Privacy**). A candidate whose applications have all been inactive for longer than that is erased for good: personal details, answers, resume, evidence and the Outbox emails sent to them. The audit log stays. It records only IDs, stages and scores. Every change of period and every erasure is itself audited.
+Each organisation keeps candidate data for a set period (default 365 days, adjustable from 30 days to 3 years under **Settings → Privacy**). A candidate whose applications have all been inactive for longer than that is erased for good: personal details, answers, resume, evidence and the Outbox emails sent to them. The audit log stays: it records IDs, stages, scores and reason codes, and any free-text decision notes about an erased candidate are removed. Every change of period and every erasure is itself audited.
 
 Run the job daily from cron:
 
