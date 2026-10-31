@@ -8,7 +8,11 @@ import { getProviders } from "@/lib/providers";
 import { REJECT_REASONS, STAGE_LABELS, STAGES, type RejectReason, type Stage } from "@/domain/constants";
 import { canTransition } from "@/domain/stages";
 import { audit } from "./audit";
-import { inviteEmail, rejectionEmail } from "./emails";
+import { bookingLinkEmail, inviteEmail, rejectionEmail } from "./emails";
+import { issueLink, linkUrl } from "./candidateLinks";
+import { hasOpenSlots } from "./interviews";
+
+const BOOKING_LINK_DAYS = 14;
 
 const reasonSchema = z.object({
   code: z.enum(REJECT_REASONS, { message: "Choose a reason from the list" }),
@@ -72,7 +76,12 @@ export async function changeStage(
     reasonText = reason.note.slice(0, 500);
   }
 
-  await db.$transaction((tx) => applyStageChange(tx, actor, app, toStage, reasonText));
+  // Moving to Interview sends a booking link when there are times to book; otherwise the email says we'll call.
+  const bookingToken = await db.$transaction(async (tx) => {
+    await applyStageChange(tx, actor, app, toStage, reasonText);
+    if (toStage !== "INTERVIEW" || !(await hasOpenSlots(tx, app.jobId))) return null;
+    return issueLink(tx, app.id, "BOOKING", new Date(Date.now() + BOOKING_LINK_DAYS * 86_400_000));
+  });
 
   const name = decrypt(app.candidate.nameEnc);
   const to = decrypt(app.candidate.emailEnc);
@@ -81,6 +90,8 @@ export async function changeStage(
       ? { kind: "CANDIDATE_INVITE", ...inviteEmail(name, app.job.title, app.job.org.name) }
       : toStage === "REJECTED"
         ? { kind: "CANDIDATE_REJECTION", ...rejectionEmail(name, app.job.title, app.job.org.name) }
-        : null;
+        : toStage === "INTERVIEW"
+          ? { kind: "CANDIDATE_INTERVIEW_LINK", ...bookingLinkEmail(name, app.job.title, app.job.org.name, bookingToken ? linkUrl("book", bookingToken) : null) }
+          : null;
   if (email) await getProviders().email.send({ orgId: actor.orgId, to, ...email });
 }
