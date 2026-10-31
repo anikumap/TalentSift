@@ -165,6 +165,19 @@ For every role: upcoming scheduled interviews (an interviewer sees their own; ot
   - audit events contain no salary or notes
 - e2e: the recruiter adds slots and moves a candidate to Interview, the candidate books from the Outbox link on a phone viewport, the interviewer submits feedback, the recruiter sends an offer, the candidate accepts, and the recruiter marks them hired.
 
+## Implementation constraints (from design review)
+
+- **Atomic stage changes.** The stage update and its audit rows move into `applyStageChange(tx, actor, app, toStage, reasonText)`. `changeStage`, `createOffer` (offer, link and stage in one transaction) and the booking link on move-to-Interview all use it. Emails are sent only after commit.
+- **Activity bump.** Every interview, feedback, link and offer write also runs `tx.application.update({ data: { updatedAt: new Date() } })`. `@updatedAt` doesn't fire for child-row inserts.
+- **Audit entity.** Interview and offer audit events use `entityType: "Application"` and `entityId: <applicationId>` (the interview or offer ID goes in `after`). The retention note-stripping then covers them: it strips free-text reasons on `STAGE_CHANGED`, `OFFER_WITHDRAWN` and `INTERVIEW_CANCELLED`.
+- **Time zones.** Tests run with `TZ=UTC`, so local-time bugs can't hide behind an IST dev machine. Every new formatter passes `timeZone: "Asia/Kolkata"`.
+- **Permissions.** New RBAC actions:
+  - `interview.view` (all roles): `/interviews`, and seeing interviews on the candidate page
+  - `interview.manage` (`stage.change` roles): slots, booking, cancelling, status changes and offers
+  - feedback submission is checked against the assigned interviewer, not a role
+- **Feedback snapshot.** `ratings` stores `[{ skillId, name, rating }]`, because removing a skill from the scorecard deletes its row.
+- **Links.** Absolute URLs use `process.env.APP_URL`, as invite links do.
+
 ## Out of scope
 
 Panels and multi-interviewer slots, calendar sync (Google or Outlook APIs), SMS or WhatsApp reminders, automatic reminders (no scheduler beyond cron), e-signature providers, offer approval chains, negotiation or counter-offers, and analytics for offer acceptance rate.
