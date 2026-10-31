@@ -147,9 +147,21 @@ model Application {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   evaluations     Evaluation[]
+  selfId          SelfId?
 
   @@unique([jobId, publicRef])
   @@unique([jobId, candidateId])
+}
+
+/// Optional, voluntary self-description. Read only by the fairness monitor, in aggregate.
+model SelfId {
+  id            String      @id @default(cuid())
+  applicationId String      @unique
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  genderEnc     String?
+  ageEnc        String?
+  disabilityEnc String?
+  createdAt     DateTime    @default(now())
 }
 
 model Evaluation {

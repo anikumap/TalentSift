@@ -2,7 +2,7 @@ import type { Role } from "@/domain/constants";
 import { AppError } from "./errors";
 
 export type Actor = { id: string; orgId: string; role: Role; name: string };
-export type Action = "job.edit" | "job.publish" | "candidate.view" | "stage.change" | "org.admin";
+export type Action = "job.edit" | "job.publish" | "candidate.view" | "stage.change" | "org.admin" | "fairness.view";
 
 const PERMISSIONS: Record<Action, Role[]> = {
   "job.edit": ["ADMIN", "RECRUITER", "HIRING_MANAGER"],
@@ -10,6 +10,7 @@ const PERMISSIONS: Record<Action, Role[]> = {
   "candidate.view": ["ADMIN", "RECRUITER", "HIRING_MANAGER", "INTERVIEWER"],
   "stage.change": ["ADMIN", "RECRUITER", "HIRING_MANAGER"],
   "org.admin": ["ADMIN"],
+  "fairness.view": ["ADMIN", "RECRUITER"],
 };
 
 export function can(role: Role, action: Action): boolean {

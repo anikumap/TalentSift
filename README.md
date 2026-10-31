@@ -23,7 +23,7 @@ Billing and email are mocks for now: checkout is a fake "pay" page and emails la
 ## Test it
 
 ```bash
-npm test        # unit + integration (Vitest, throwaway prisma/test.db)
+npm test        # unit + integration + grading benchmark (Vitest, throwaway prisma/test.db)
 npm run build   # production build + type check
 npm run e2e     # Playwright end-to-end, builds and serves on :3100 with prisma/e2e.db
 ```
@@ -37,13 +37,28 @@ The first time you run e2e, install the browser with `npx playwright install chr
 | Role intake chat → weighted scorecard | `/jobs/new`, `src/providers/ai/` |
 | Job ad generator + inclusive-wording checker | job Setup → Job ad, `src/domain/wording.ts` |
 | Mobile apply page (no account, resume optional) | `/apply/[slug]` |
-| Work-sample grading with quoted evidence | `src/services/applications.ts` |
+| Work-sample grading with quoted evidence (rule-based, no API cost) | `src/domain/grading/`, `src/services/applications.ts` |
 | Resume parsing (PDF/.txt, minor signal ≤10%) | `src/services/resume.ts` |
 | Ranked, identity-hidden shortlist | `/jobs/[id]/candidates` |
 | Advance / hold / reject (reason required) + emails | `src/services/decisions.ts`, `/outbox` |
 | Pipeline board (drag or "Move to") | `/jobs/[id]/board` |
 | INR billing: Trial, Starter ₹999, Growth ₹2,999, single job ₹399 (+18% GST) | `/settings/billing` |
 | Team invites with roles, audit log | `/settings/team`, `/settings/audit` |
+
+## Grading
+
+Answers are graded by a deterministic rule-based grader, not an LLM, so grading costs nothing and the same answer always gets the same score. Each skill has a rubric of *concepts* (synonym groups and phrase patterns such as "tell the supervisor"), *red flags* (unsafe or dishonest actions, which cap the skill at 1), and general quality signals (clear steps, concrete detail). It understands negation ("I would **never** force her" is good, "force the medicine" is not), common Indian English phrasing, and spots keyword stuffing. Custom roles fall back to a rubric built from the scorecard's keywords.
+
+It's checked against a hand-labelled benchmark of 142 answers (`tests/benchmark/`, rubric in `tests/benchmark/RUBRIC.md`) on every `npm test`:
+
+| Set | Within ±1 | Exact | Rank correlation | Unsafe answers kept ≤ 1 |
+|---|---|---|---|---|
+| Template roles, held-out answers | 94.3% | 65.7% | 0.90 | 100% |
+| Template roles, tuning answers | 99.0% | 65.6% | 0.91 | 100% |
+| Custom role ("Kitchen helper") | 87.5% | 55.0% | 0.86 | — |
+| Previous keyword-count mock (held-out) | 70.0% | 35.7% | 0.52 | 100% |
+
+The labels and the rules were written by the same author, so the held-out split is the honest number; an independent re-label would make it stronger.
 
 ## Compliance built in
 
@@ -74,10 +89,22 @@ src/app/        Next.js pages, server actions and the apply API route
 tests/          unit, integration and e2e
 ```
 
+## Data retention
+
+Each organisation keeps candidate data for a set period (default 365 days, adjustable from 30 days to 3 years under **Settings → Privacy**). A candidate whose applications have all been inactive for longer than that is erased for good: personal details, answers, resume, evidence and the Outbox emails sent to them. The audit log stays. It records only IDs, stages and scores. Every change of period and every erasure is itself audited.
+
+Run the job daily from cron:
+
+```bash
+15 2 * * *  cd /srv/talentsift && npm run retention
+```
+
+Admins can also preview what the next run would erase and run it from the Privacy page.
+
 ## Swapping in real providers
 
-The AI, email and billing providers are interfaces in `src/providers/types.ts`, and they're chosen in `src/lib/providers.ts`. To go live, add a Claude provider (`claude-sonnet-5-5` for grading, `claude-haiku-5-5` for parsing), a Resend email provider and a Razorpay billing provider. No service code changes. To move to Postgres, change `provider` in `prisma/schema.prisma` and set `DATABASE_URL`.
+The AI, email and billing providers are interfaces in `src/providers/types.ts`, and they're chosen in `src/lib/providers.ts`. Grading uses `RuleBasedAIProvider` (scorecard, job-ad and resume generation still come from the mock). If you later want LLM grading, add a Claude provider (`claude-sonnet-5-5` for grading, `claude-haiku-5-5` for parsing) and run it against the same benchmark. For going live you'd also add a Resend email provider and a Razorpay billing provider. No service code changes. To move to Postgres, change `provider` in `prisma/schema.prisma` and set `DATABASE_URL`.
 
 ## Not built yet
 
-Phases 2–6 of the plan: AI chat/SMS screens, scheduling, interviews and offers, integrations, analytics, the bias monitor, and SOC 2. The data-retention setting is stored, but the job that enforces it hasn't been built yet.
+Still to build: chat screening (web only, SMS needs a paid provider), scheduling, interviews and offers, integrations, and SOC 2 readiness. Data retention, hiring analytics and the fairness monitor (`/analytics`) are built.

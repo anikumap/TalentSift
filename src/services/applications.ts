@@ -11,6 +11,7 @@ import { detectInjection } from "@/domain/injection";
 import { redactText } from "@/domain/redact";
 import { computeTotal, resumeSignal, type ParsedResume } from "@/domain/scoring";
 import { audit } from "./audit";
+import { optionKeys } from "@/domain/selfid";
 import { extractResumeText, RESUME_MAX_BYTES, RESUME_TYPES, resumeExtension } from "./resume";
 
 export const ANSWER_MAX = 1000;
@@ -30,6 +31,13 @@ const applicationSchema = z.object({
     .object({ filename: z.string().max(200), bytes: z.instanceof(Buffer) })
     .refine((r) => RESUME_TYPES.includes(resumeExtension(r.filename)), "Resume must be a PDF or .txt file")
     .refine((r) => r.bytes.length <= RESUME_MAX_BYTES, "Resume must be 5 MB or smaller")
+    .optional(),
+  selfId: z
+    .object({
+      gender: z.enum(optionKeys("gender")).optional(),
+      age: z.enum(optionKeys("age")).optional(),
+      disability: z.enum(optionKeys("disability")).optional(),
+    })
     .optional(),
 });
 
@@ -93,6 +101,17 @@ export async function submitApplication(slug: string, input: ApplicationInput): 
         resumeParsed: resumeParsed ? JSON.stringify(resumeParsed) : null,
       },
     });
+    const self = data.selfId ?? {};
+    if (self.gender || self.age || self.disability) {
+      await tx.selfId.create({
+        data: {
+          applicationId: created.id,
+          genderEnc: self.gender ? encrypt(self.gender) : null,
+          ageEnc: self.age ? encrypt(self.age) : null,
+          disabilityEnc: self.disability ? encrypt(self.disability) : null,
+        },
+      });
+    }
     await audit(tx, {
       orgId: job.orgId,
       action: "APPLICATION_SUBMITTED",

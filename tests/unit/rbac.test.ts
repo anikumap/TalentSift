@@ -15,6 +15,13 @@ describe("rbac", () => {
     expect(can("INTERVIEWER", "candidate.view")).toBe(true);
   });
 
+  it("limits the fairness monitor to admins and recruiters", () => {
+    expect(can("ADMIN", "fairness.view")).toBe(true);
+    expect(can("RECRUITER", "fairness.view")).toBe(true);
+    expect(can("HIRING_MANAGER", "fairness.view")).toBe(false);
+    expect(can("INTERVIEWER", "fairness.view")).toBe(false);
+  });
+
   it("throws a FORBIDDEN AppError when not allowed", () => {
     const actor = { id: "u", orgId: "o", role: "INTERVIEWER" as const, name: "I" };
     try {

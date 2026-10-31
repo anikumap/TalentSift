@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { FormError, cx } from "@/components/ui";
+import { SELF_ID, SELF_ID_KEYS, type SelfIdKey } from "@/domain/selfid";
 
 type Job = {
   title: string;
@@ -23,6 +24,7 @@ export function ApplyFlow({ slug, job }: { slug: string; job: Job }) {
   const [mustHaves, setMustHaves] = useState<Record<string, boolean | undefined>>({});
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [resume, setResume] = useState<File | null>(null);
+  const [selfId, setSelfId] = useState<Partial<Record<SelfIdKey, string>>>({});
   const [error, setError] = useState<string>();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -73,6 +75,7 @@ export function ApplyFlow({ slug, job }: { slug: string; job: Job }) {
     for (const [k, v] of Object.entries(contact)) body.set(k, v);
     body.set("mustHaveAnswers", JSON.stringify(mustHaves));
     body.set("answers", JSON.stringify(answers));
+    body.set("selfId", JSON.stringify(Object.fromEntries(Object.entries(selfId).filter(([, v]) => v))));
     if (resume) body.set("resume", resume);
     try {
       const res = await fetch(`/api/apply/${slug}`, { method: "POST", body });
@@ -249,6 +252,30 @@ export function ApplyFlow({ slug, job }: { slug: string; job: Job }) {
             </button>
           )}
           {fieldError("resume")}
+
+          <fieldset className="space-y-3 rounded-lg border border-line p-4">
+            <legend className="px-1 font-semibold">About you (optional)</legend>
+            <p className="text-sm text-ink-3">
+              These answers are never shown to anyone reviewing your application and don&apos;t affect your score. We only use
+              them as totals to check our hiring is fair. Skip any you like.
+            </p>
+            {SELF_ID_KEYS.map((key) => (
+              <div key={key}>
+                <label htmlFor={`self-${key}`} className="label">{SELF_ID[key].label}</label>
+                <select
+                  id={`self-${key}`}
+                  className="field"
+                  value={selfId[key] ?? ""}
+                  onChange={(e) => setSelfId({ ...selfId, [key]: e.target.value })}
+                >
+                  <option value="">Prefer not to say</option>
+                  {Object.entries(SELF_ID[key].options).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </fieldset>
         </div>
       )}
 
