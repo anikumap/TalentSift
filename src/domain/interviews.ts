@@ -61,6 +61,10 @@ export const istTime = (d: Date): string => timeFmt.format(d);
 /** e.g. "Wednesday, 4 November" in India time. */
 export const istDay = (d: Date): string => dayFmt.format(d);
 
+const longDateFmt = new Intl.DateTimeFormat("en-IN", { timeZone: IST, day: "numeric", month: "long", year: "numeric" });
+/** e.g. "10 November 2026" in India time. */
+export const istDate = (d: Date): string => longDateFmt.format(d);
+
 /** "YYYY-MM-DD" of the India calendar day `d` falls on. */
 export function istDayKey(d: Date): string {
   return new Date(d.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
@@ -69,8 +73,32 @@ export function istDayKey(d: Date): string {
 const icsStamp = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 const icsText = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 
-/** A single-event iCalendar file (RFC 5545) that any phone or mail app can add. */
-export function toIcs(e: { uid: string; startsAt: Date; durationMin: number; summary: string; location: string; description: string }): string {
+/** Folds a content line at 75 octets (RFC 5545 §3.1) without splitting a UTF-8 character. */
+function foldLine(line: string): string {
+  const enc = new TextEncoder();
+  const parts: string[] = [];
+  let cur = "";
+  let size = 0;
+  for (const ch of line) {
+    const n = enc.encode(ch).length;
+    const limit = parts.length === 0 ? 75 : 74; // continuation lines start with a space
+    if (size + n > limit) {
+      parts.push(cur);
+      cur = "";
+      size = 0;
+    }
+    cur += ch;
+    size += n;
+  }
+  parts.push(cur);
+  return parts.join("\r\n ");
+}
+
+/** A single-event iCalendar file (RFC 5545) that any phone or mail app can add. `stamp` is when the file was made. */
+export function toIcs(
+  e: { uid: string; startsAt: Date; durationMin: number; summary: string; location: string; description: string },
+  stamp: Date = new Date(),
+): string {
   const end = new Date(e.startsAt.getTime() + e.durationMin * MINUTE);
   return [
     "BEGIN:VCALENDAR",
@@ -79,7 +107,7 @@ export function toIcs(e: { uid: string; startsAt: Date; durationMin: number; sum
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
     `UID:${e.uid}@talentsift`,
-    `DTSTAMP:${icsStamp(e.startsAt)}`,
+    `DTSTAMP:${icsStamp(stamp)}`,
     `DTSTART:${icsStamp(e.startsAt)}`,
     `DTEND:${icsStamp(end)}`,
     `SUMMARY:${icsText(e.summary)}`,
@@ -87,6 +115,8 @@ export function toIcs(e: { uid: string; startsAt: Date; durationMin: number; sum
     `DESCRIPTION:${icsText(e.description)}`,
     "END:VEVENT",
     "END:VCALENDAR",
-    "",
-  ].join("\r\n");
+  ]
+    .map(foldLine)
+    .join("\r\n")
+    .concat("\r\n");
 }

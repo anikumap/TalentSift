@@ -44,6 +44,14 @@ export async function applyStageChange(
   await tx.application.update({ where: { id: app.id }, data: { stage: toStage, ...(reveal ? { revealed: true } : {}) } });
   await audit(tx, { ...base, action: "STAGE_CHANGED", reason: reasonText, before: { stage: from }, after: { stage: toStage } });
   if (reveal) await audit(tx, { ...base, action: "IDENTITY_REVEALED", reason: `Advanced to ${STAGE_LABELS[toStage]}` });
+  if (toStage === "REJECTED" || toStage === "HIRED") {
+    // A closed application keeps no upcoming interviews: free the slots for other candidates.
+    const upcoming = await tx.interview.findMany({ where: { applicationId: app.id, status: "SCHEDULED", startsAt: { gt: new Date() } } });
+    for (const iv of upcoming) {
+      await tx.interview.update({ where: { id: iv.id }, data: { status: "CANCELLED", slotId: null } });
+      await audit(tx, { ...base, action: "INTERVIEW_CANCELLED", after: { interviewId: iv.id, because: toStage } });
+    }
+  }
 }
 
 /** The only way an application changes stage. Always a human actor; always audited. */

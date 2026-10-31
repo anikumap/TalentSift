@@ -87,3 +87,38 @@ export function interviewCancelledEmail(name: string, jobTitle: string, orgName:
     ].join("\n"),
   };
 }
+
+export function offerEmail(name: string, jobTitle: string, orgName: string, url: string, respondBy: string): Email {
+  const first = name.split(" ")[0];
+  return {
+    subject: `Your offer for ${jobTitle} at ${orgName}`,
+    body: [
+      `Hi ${first},`,
+      "",
+      `We're happy to offer you the ${jobTitle} role at ${orgName}.`,
+      "",
+      "Read the offer letter and accept or decline it here:",
+      url,
+      "",
+      `Please reply by ${respondBy}. If you have questions, reply to this email before you decide.`,
+      "",
+      `— The ${orgName} hiring team`,
+    ].join("\n"),
+  };
+}
+
+export function offerWithdrawnEmail(name: string, jobTitle: string, orgName: string): Email {
+  const first = name.split(" ")[0];
+  return {
+    subject: `An update on your ${jobTitle} offer`,
+    body: [
+      `Hi ${first},`,
+      "",
+      `We're sorry to tell you that we have withdrawn our offer for the ${jobTitle} role at ${orgName}. The link in our earlier email no longer works.`,
+      "",
+      "This isn't a reflection on you, and we're grateful for the time you gave us. If you'd like to talk about it, please reply to this email.",
+      "",
+      `— The ${orgName} hiring team`,
+    ].join("\n"),
+  };
+}

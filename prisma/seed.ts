@@ -8,6 +8,12 @@ import { createJobFromIntake, getJob, publishJob } from "../src/services/jobs";
 import { submitApplication } from "../src/services/applications";
 import { changeStage } from "../src/services/decisions";
 import { confirmCheckout, startCheckout } from "../src/services/billing";
+import { addSlots, bookForCandidate } from "../src/services/interviews";
+import { submitFeedback } from "../src/services/feedback";
+import { createOffer, respondToOffer } from "../src/services/offers";
+import { istDayKey } from "../src/domain/interviews";
+import bcrypt from "bcryptjs";
+import { decrypt } from "../src/lib/crypto";
 
 const DEMO_EMAIL = "admin@demo.test";
 
@@ -175,8 +181,44 @@ async function main() {
     }
   }
 
+  // Interviews and offers: an interviewer, interview times, one candidate all the way to an accepted offer,
+  // and one with an interview coming up.
+  const user = await db.user.create({
+    data: { orgId: admin.orgId, email: "interviewer@demo.test", name: "Rahul Patil", role: "INTERVIEWER", passwordHash: await bcrypt.hash("demo1234", 10) },
+  });
+  const interviewer = { id: user.id, orgId: user.orgId, role: "INTERVIEWER" as const, name: user.name };
+  const day = (n: number) => istDayKey(new Date(Date.now() + n * DAY));
+  await addSlots(admin, caregiver, { date: day(1), from: "10:00", to: "13:00", lengthMin: 30, interviewerId: interviewer.id, mode: "IN_PERSON", location: "Sahyadri office, 2nd floor, Karve Road, Kothrud (near Nal Stop)" });
+  await addSlots(admin, caregiver, { date: day(2), from: "15:00", to: "17:00", lengthMin: 30, interviewerId: admin.id, mode: "PHONE", location: "We'll call you on the mobile number you gave us" });
+  const slots = await db.interviewSlot.findMany({ where: { jobId: caregiver }, orderBy: { startsAt: "asc" } });
+
+  // Meena (top caregiver) was interviewed two days ago, got good feedback, and accepted an offer.
+  const top = cgApps[0].id;
+  await bookForCandidate(admin, top, slots[0].id);
+  const past = new Date(Date.now() - 2 * DAY);
+  past.setUTCHours(4, 30, 0, 0); // 10:00 IST
+  await db.interviewSlot.update({ where: { id: slots[0].id }, data: { startsAt: past } });
+  await db.interview.updateMany({ where: { applicationId: top }, data: { startsAt: past } });
+  const ivId = (await db.interview.findFirstOrThrow({ where: { applicationId: top } })).id;
+  const skills = cg.skills.map((sk) => sk.id);
+  await submitFeedback(interviewer, ivId, {
+    ratings: Object.fromEntries(skills.map((id, i) => [id, i % 3 === 0 ? 4 : 3])),
+    recommendation: "STRONG_YES",
+    notes: "Walked me through how she handles a refused dose, step by step. Calm and kind with the family role-play.",
+  });
+  await createOffer(admin, top, { monthlyPay: 22000, startDate: day(10), respondBy: day(4), terms: "Six-day week with one paid leave a month. Uniform provided." });
+  const offerMail = await db.message.findFirstOrThrow({ where: { orgId: admin.orgId, kind: "CANDIDATE_OFFER" }, orderBy: { createdAt: "desc" } });
+  const offerToken = /\/offer\/([\w-]+)/.exec(offerMail.body)![1];
+  const signed = await db.application.findUniqueOrThrow({ where: { id: top }, include: { candidate: true } });
+  await respondToOffer(offerToken, { accept: true, signedName: decrypt(signed.candidate.nameEnc) });
+
+  // The second caregiver is moved to Interview and booked into tomorrow with Rahul.
+  await changeStage(admin, cgApps[1].id, "INTERVIEW");
+  await bookForCandidate(admin, cgApps[1].id, slots[1].id);
+
   const count = await db.application.count({ where: { job: { orgId: admin.orgId } } });
   console.log(`Seeded demo org with 2 open jobs and ${count} candidates.`);
+  console.log("Interviewer login: interviewer@demo.test / demo1234");
   console.log(`Log in at http://localhost:3000/login with ${DEMO_EMAIL} / demo1234`);
 }
 

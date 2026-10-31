@@ -20,6 +20,14 @@ const ACTION_LABELS: Record<string, string> = {
   PLAN_CHANGED: "Plan changed",
   RETENTION_CHANGED: "Retention changed",
   RETENTION_PURGE: "Old candidate data erased",
+  INTERVIEW_SLOTS_ADDED: "Interview times added",
+  INTERVIEW_BOOKED: "Interview booked",
+  INTERVIEW_CANCELLED: "Interview cancelled",
+  INTERVIEW_STATUS_CHANGED: "Interview closed",
+  FEEDBACK_SUBMITTED: "Feedback submitted",
+  OFFER_SENT: "Offer sent",
+  OFFER_RESPONDED: "Offer answered",
+  OFFER_WITHDRAWN: "Offer withdrawn",
 };
 
 function summarize(json: string | null): string {

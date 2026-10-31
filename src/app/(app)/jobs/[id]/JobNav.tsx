@@ -5,6 +5,7 @@ const TABS = [
   { key: "overview", label: "Setup", href: (id: string) => `/jobs/${id}` },
   { key: "candidates", label: "Shortlist", href: (id: string) => `/jobs/${id}/candidates` },
   { key: "board", label: "Pipeline", href: (id: string) => `/jobs/${id}/board` },
+  { key: "interviews", label: "Interviews", href: (id: string) => `/jobs/${id}/interviews` },
 ] as const;
 
 export function JobNav({ jobId, active, applicants }: { jobId: string; active: (typeof TABS)[number]["key"]; applicants: number }) {
@@ -21,7 +22,7 @@ export function JobNav({ jobId, active, applicants }: { jobId: string; active: (
           )}
         >
           {t.label}
-          {t.key !== "overview" && <span className="tnum ml-1.5 font-normal text-ink-3">{applicants}</span>}
+          {(t.key === "candidates" || t.key === "board") && <span className="tnum ml-1.5 font-normal text-ink-3">{applicants}</span>}
         </Link>
       ))}
     </nav>

@@ -16,7 +16,7 @@ npm run seed                  # optional demo data
 npm run dev                   # http://localhost:3000
 ```
 
-Demo login after seeding: `admin@demo.test` / `demo1234`. The seed script refuses to run when `NODE_ENV=production`.
+Demo logins after seeding: `admin@demo.test` / `demo1234` (Admin) and `interviewer@demo.test` / `demo1234` (Interviewer). The seed script refuses to run when `NODE_ENV=production`.
 
 Billing and email are mocks for now: checkout is a fake "pay" page and emails land in the in-app Outbox. A production build (`npm start`) refuses to use them unless you set `ALLOW_MOCK_PROVIDERS=true`, so a real deployment can't hand out free plans by accident.
 
@@ -44,6 +44,10 @@ The first time you run e2e, install the browser with `npx playwright install chr
 | Pipeline board (drag or "Move to") | `/jobs/[id]/board` |
 | INR billing: Trial, Starter ₹999, Growth ₹2,999, single job ₹399 (+18% GST) | `/settings/billing` |
 | Team invites with roles, audit log | `/settings/team`, `/settings/audit` |
+| Interview times; candidates book, change or cancel from an emailed link on their phone; `.ics` calendar files | job → Interviews, `/book/[token]`, `src/services/interviews.ts` |
+| Team booking, "My interviews" and feedback due | candidate page, `/interviews` |
+| Structured interviewer feedback (0–4 per skill, recommendation), hidden from other interviewers until theirs is in | candidate page → Interview feedback, `src/services/feedback.ts` |
+| Offers: printable letter, candidate accepts (typed name) or declines from a link, then a person marks them hired | candidate page → Offer, `/offer/[token]`, `src/services/offers.ts` |
 
 ## Grading
 
@@ -101,10 +105,16 @@ Run the job daily from cron:
 
 Admins can also preview what the next run would erase and run it from the Privacy page.
 
+## Interviews and offers
+
+All interview times are entered and shown in India time (`Asia/Kolkata`) and stored in UTC. Moving a candidate to **Interview** emails them a booking link (valid 14 days); if the job has no open times yet, the email says the team will call. Candidates can change or cancel up to 12 hours before the start. Booking never changes a candidate's stage, and an accepted offer doesn't mark anyone hired: both stay human, audited decisions. Calendar invites are plain `.ics` files, so there's no calendar API to pay for.
+
+Salaries, feedback notes and offer terms never go into the audit log, and interviews, feedback, offers and candidate links are erased with the application by the retention job. Every booking, feedback or offer reply counts as activity, so a candidate in an active process isn't purged.
+
 ## Swapping in real providers
 
 The AI, email and billing providers are interfaces in `src/providers/types.ts`, and they're chosen in `src/lib/providers.ts`. Grading uses `RuleBasedAIProvider` (scorecard, job-ad and resume generation still come from the mock). If you later want LLM grading, add a Claude provider (`claude-sonnet-5-5` for grading, `claude-haiku-5-5` for parsing) and run it against the same benchmark. For going live you'd also add a Resend email provider and a Razorpay billing provider. No service code changes. To move to Postgres, change `provider` in `prisma/schema.prisma` and set `DATABASE_URL`.
 
 ## Not built yet
 
-Still to build: chat screening (web only, SMS needs a paid provider), scheduling, interviews and offers, integrations, and SOC 2 readiness. Data retention, hiring analytics and the fairness monitor (`/analytics`) are built.
+Still to build: chat screening (web only, SMS needs a paid provider), interview panels (one interviewer per slot today), calendar sync and automatic reminders, e-signature and offer approval chains, integrations, and SOC 2 readiness. Data retention, hiring analytics, the fairness monitor (`/analytics`), interview scheduling, feedback and offers are built.

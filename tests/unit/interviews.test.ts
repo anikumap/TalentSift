@@ -55,4 +55,17 @@ describe("interview time helpers", () => {
     expect(ics.endsWith("END:VCALENDAR\r\n")).toBe(true);
     expect(ics.split("\r\n").every((line) => !line.includes("\n"))).toBe(true);
   });
+
+  it("ics: DTSTAMP is when the file was made, and long lines fold at 75 octets", () => {
+    const location = "Sahyadri Home Care office, 2nd floor, Karve Road, Kothrud, Pune — near Nal Stop, opposite the bakery (ask for Priya)";
+    const ics = toIcs(
+      { uid: "x", startsAt: new Date("2026-11-04T04:30:00Z"), durationMin: 30, summary: "Interview", location, description: "d" },
+      new Date("2026-11-01T10:00:00Z"),
+    );
+    expect(ics).toContain("DTSTAMP:20261101T100000Z\r\n");
+    const lines = ics.split("\r\n");
+    expect(lines.every((l) => new TextEncoder().encode(l).length <= 75)).toBe(true);
+    const unfolded = ics.replace(/\r\n /g, "");
+    expect(unfolded).toContain(`LOCATION:${location.replace(/,/g, "\\,")}\r\n`);
+  });
 });

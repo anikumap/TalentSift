@@ -27,3 +27,11 @@ export async function resolveLink(token: string, purpose: LinkPurpose, now = new
 }
 
 export const linkUrl = (path: "book" | "offer", token: string) => `${process.env.APP_URL ?? ""}/${path}/${token}`;
+
+/** Like resolveLink, but tells an expired link apart from an unknown one (for "this offer has expired"). */
+export async function findLink(token: string, purpose: LinkPurpose, now = new Date()): Promise<{ applicationId: string; expired: boolean } | null> {
+  if (!token || token.length > 100) return null;
+  const link = await db.candidateLink.findUnique({ where: { tokenHash: sha256(token) } });
+  if (!link || link.purpose !== purpose) return null;
+  return { applicationId: link.applicationId, expired: link.expiresAt <= now };
+}

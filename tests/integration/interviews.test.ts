@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { db } from "@/lib/db";
 import { createJobFromIntake, getJob, publishJob } from "@/services/jobs";
 import { submitApplication } from "@/services/applications";
@@ -14,6 +14,8 @@ import {
   interviewIcsByToken,
   listMyInterviews,
   listSlots,
+  listTeam,
+  resendBookingLink,
   setInterviewStatus,
 } from "@/services/interviews";
 import { purgeExpired } from "@/services/retention";
@@ -247,6 +249,85 @@ describe("interviews service", () => {
     await bookByToken(token, slots[0].id);
     const ics = await interviewIcsByToken(token);
     expect(ics).toContain("LOCATION:Sunrise Care office\\, Kothrud");
+  });
+
+  it("resends a booking link once there are slots, replacing the old token", async () => {
+    const { appId } = await toInterview();
+    await expect(resendBookingLink(admin, appId)).rejects.toMatchObject({ code: "VALIDATION" });
+    await slotsTomorrow();
+    await resendBookingLink(admin, appId);
+    const mail = await db.message.findFirstOrThrow({ where: { kind: "CANDIDATE_INTERVIEW_LINK" }, orderBy: { createdAt: "desc" } });
+    const token = /\/book\/([\w-]+)/.exec(mail.body)![1];
+    expect((await getBookingPage(token)).state).toBe("choose");
+    await expect(resendBookingLink(interviewer, appId)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("lists the team for the interviewer picker, managers only", async () => {
+    const team = await listTeam(admin);
+    expect(team.map((m) => m.id).sort()).toEqual([admin.id, interviewer.id].sort());
+    await expect(listTeam(interviewer)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("review #2: booking round two never cancels an interview that already started", async () => {
+    const slots = await slotsTomorrow();
+    const { appId } = await toInterview();
+    await bookForCandidate(admin, appId, slots[0].id);
+    const first = await db.interview.findFirstOrThrow({ where: { applicationId: appId } });
+    await db.interview.update({ where: { id: first.id }, data: { startsAt: new Date(Date.now() - HOUR) } });
+    await expect(bookForCandidate(admin, appId, slots[1].id)).rejects.toMatchObject({ code: "VALIDATION" });
+    expect((await db.interview.findUniqueOrThrow({ where: { id: first.id } })).status).toBe("SCHEDULED");
+    await setInterviewStatus(admin, first.id, "COMPLETED");
+    await bookForCandidate(admin, appId, slots[1].id);
+    expect((await db.interview.findUniqueOrThrow({ where: { id: first.id } })).status).toBe("COMPLETED");
+    expect(await db.interview.count({ where: { applicationId: appId, status: "SCHEDULED" } })).toBe(1);
+  });
+
+  it("review #3: rejecting or hiring cancels upcoming interviews and frees their slots", async () => {
+    const slots = await slotsTomorrow();
+    const { appId, token } = await toInterview();
+    await bookByToken(token, slots[0].id);
+    await changeStage(admin, appId, "REJECTED", { code: "Position filled" });
+    const iv = await db.interview.findFirstOrThrow({ where: { applicationId: appId } });
+    expect(iv).toMatchObject({ status: "CANCELLED", slotId: null });
+    expect(await db.auditEvent.count({ where: { action: "INTERVIEW_CANCELLED", entityId: appId } })).toBe(1);
+    expect((await listSlots(admin, jobId)).find((s) => s.id === slots[0].id)?.booked).toBeNull();
+    expect((await listMyInterviews(interviewer, { mineOnly: true })).upcoming).toHaveLength(0);
+  });
+
+  it("small: a booked interview that has started reads as started, not changeable", async () => {
+    const slots = await slotsTomorrow();
+    const { appId, token } = await toInterview();
+    await bookByToken(token, slots[0].id);
+    await db.interview.updateMany({ where: { applicationId: appId }, data: { startsAt: new Date(Date.now() - HOUR) } });
+    const page = await getBookingPage(token);
+    expect(page.state).toBe("booked");
+    if (page.state === "booked") {
+      expect(page.interview.started).toBe(true);
+      expect(page.interview.canChange).toBe(false);
+    }
+  });
+
+  it("small: cancelling by link is refused once the application has left Interview", async () => {
+    const slots = await slotsTomorrow();
+    const { appId, token } = await toInterview();
+    await bookByToken(token, slots[0].id);
+    await changeStage(admin, appId, "OFFER");
+    await expect(cancelByToken(token)).rejects.toMatchObject({ code: "CONFLICT" });
+    expect((await db.interview.findFirstOrThrow({ where: { applicationId: appId } })).status).toBe("SCHEDULED");
+  });
+
+  it("small: booking re-checks the stage inside its transaction", async () => {
+    const slots = await slotsTomorrow();
+    const { appId } = await toInterview();
+    const stale = await db.application.findFirstOrThrow({ where: { id: appId }, include: { candidate: true, job: { include: { org: true } } } });
+    await changeStage(admin, appId, "REJECTED", { code: "Other" });
+    const spy = vi.spyOn(db.application, "findFirst").mockResolvedValueOnce(stale as never);
+    try {
+      await expect(bookForCandidate(admin, appId, slots[0].id)).rejects.toMatchObject({ code: "CONFLICT" });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await db.interview.count({ where: { applicationId: appId } })).toBe(0);
   });
 
   it("retention erases interviews and links", async () => {

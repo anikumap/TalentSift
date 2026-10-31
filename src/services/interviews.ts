@@ -17,8 +17,8 @@ import {
   toIcs,
 } from "@/domain/interviews";
 import { audit } from "./audit";
-import { resolveLink } from "./candidateLinks";
-import { interviewCancelledEmail, interviewConfirmedEmail } from "./emails";
+import { issueLink, linkUrl, resolveLink } from "./candidateLinks";
+import { bookingLinkEmail, interviewCancelledEmail, interviewConfirmedEmail } from "./emails";
 
 type Tx = Prisma.TransactionClient;
 
@@ -53,7 +53,7 @@ export type BookingPage =
       state: "booked";
       orgName: string;
       jobTitle: string;
-      interview: { id: string; startsAt: Date; durationMin: number; mode: InterviewMode; location: string; canChange: boolean };
+      interview: { id: string; startsAt: Date; durationMin: number; mode: InterviewMode; location: string; canChange: boolean; started: boolean };
       slots: OpenSlot[];
     };
 
@@ -90,6 +90,14 @@ async function openSlots(jobId: string, now = new Date()): Promise<OpenSlot[]> {
     select: { id: true, startsAt: true, durationMin: true, mode: true },
   });
   return slots.map((s) => ({ ...s, mode: s.mode as InterviewMode }));
+}
+
+/** Future, unbooked times for the job (team-facing "book for candidate" picker). */
+export async function listOpenSlots(actor: Actor, jobId: string): Promise<OpenSlot[]> {
+  assertCan(actor, "interview.manage");
+  const job = await db.job.findFirst({ where: { id: jobId, orgId: actor.orgId }, select: { id: true } });
+  if (!job) throw new AppError("NOT_FOUND", "Job not found.");
+  return openSlots(jobId);
 }
 
 /** True if the job has at least one bookable time. */
@@ -209,6 +217,9 @@ async function book(app: AppForBooking, slotId: string, actor: Actor | null): Pr
   const now = new Date();
   const created = await db
     .$transaction(async (tx) => {
+      // Re-read inside the transaction: the application may have been rejected since it was loaded.
+      const fresh = await tx.application.findUnique({ where: { id: app.id }, select: { stage: true } });
+      if (fresh?.stage !== "INTERVIEW") throw new AppError("CONFLICT", "This position is no longer open for interviews.");
       const slot = await tx.interviewSlot.findFirst({ where: { id: slotId, jobId: app.jobId }, include: { interview: true } });
       if (!slot) throw new AppError("NOT_FOUND", "That interview time doesn't exist.");
       if (slot.startsAt <= now) throw new AppError("CONFLICT", "That time has already passed. Please pick another.");
@@ -216,6 +227,9 @@ async function book(app: AppForBooking, slotId: string, actor: Actor | null): Pr
       if (current?.slotId === slotId) return null;
       if (slot.interview) throw new AppError("CONFLICT", "Sorry, someone just took that time. Please pick another.");
       if (current) {
+        if (current.startsAt <= now) {
+          throw new AppError("VALIDATION", "The earlier interview has already started. Mark it completed or didn't attend before booking another.");
+        }
         if (!actor && !canCandidateChange(current.startsAt, now)) {
           throw new AppError("VALIDATION", "It's less than 12 hours to your interview, so it can't be changed here. Please reply to our email.");
         }
@@ -281,7 +295,8 @@ export async function getBookingPage(token: string): Promise<BookingPage> {
   if (!app) return { state: "invalid" };
   const head = { orgName: app.job.org.name, jobTitle: app.job.title };
   if (app.stage !== "INTERVIEW") return { state: "closed", ...head };
-  const [current, slots] = await Promise.all([scheduled(db, app.id), openSlots(app.jobId)]);
+  const now = new Date();
+  const [current, slots] = await Promise.all([scheduled(db, app.id), openSlots(app.jobId, now)]);
   if (!current) return { state: "choose", ...head, slots };
   return {
     state: "booked",
@@ -293,7 +308,8 @@ export async function getBookingPage(token: string): Promise<BookingPage> {
       durationMin: current.durationMin,
       mode: current.mode as InterviewMode,
       location: current.location,
-      canChange: canCandidateChange(current.startsAt, new Date()),
+      canChange: canCandidateChange(current.startsAt, now),
+      started: current.startsAt <= now,
     },
   };
 }
@@ -307,6 +323,7 @@ export async function bookByToken(token: string, slotId: string): Promise<void> 
 export async function cancelByToken(token: string): Promise<void> {
   const app = await appForToken(token);
   if (!app) throw new AppError("NOT_FOUND", "This link has expired. Please reply to our email for a new one.");
+  if (app.stage !== "INTERVIEW") throw new AppError("CONFLICT", "Booking is closed for this application. Please reply to our email.");
   const current = await scheduled(db, app.id);
   if (!current) throw new AppError("NOT_FOUND", "You don't have an interview booked.");
   if (!canCandidateChange(current.startsAt, new Date())) {
@@ -386,6 +403,32 @@ export async function setInterviewStatus(actor: Actor, interviewId: string, stat
       after: { interviewId: iv.id, status },
     });
   });
+}
+
+/** Issues a fresh booking link (the old one stops working) and emails it. */
+export async function resendBookingLink(actor: Actor, appId: string): Promise<void> {
+  assertCan(actor, "interview.manage");
+  const app = await loadApp({ id: appId, job: { orgId: actor.orgId } });
+  if (!app) throw new AppError("NOT_FOUND", "Application not found.");
+  if (app.stage !== "INTERVIEW") throw new AppError("VALIDATION", "Move the candidate to Interview first.");
+  const token = await db.$transaction(async (tx) => {
+    if (!(await hasOpenSlots(tx, app.jobId))) throw new AppError("VALIDATION", "Add some interview times for this job first.");
+    const t = await issueLink(tx, app.id, "BOOKING", new Date(Date.now() + 14 * 86_400_000));
+    await touch(tx, app.id);
+    return t;
+  });
+  await getProviders().email.send({
+    orgId: actor.orgId,
+    to: decrypt(app.candidate.emailEnc),
+    kind: "CANDIDATE_INTERVIEW_LINK",
+    ...bookingLinkEmail(decrypt(app.candidate.nameEnc), app.job.title, app.job.org.name, linkUrl("book", token)),
+  });
+}
+
+/** Everyone in the organisation, for the interviewer picker. */
+export async function listTeam(actor: Actor): Promise<{ id: string; name: string; role: string }[]> {
+  assertCan(actor, "interview.manage");
+  return db.user.findMany({ where: { orgId: actor.orgId }, orderBy: { name: "asc" }, select: { id: true, name: true, role: true } });
 }
 
 // ---------- Lists ----------

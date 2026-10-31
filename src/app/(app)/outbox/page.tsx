@@ -10,6 +10,11 @@ export const metadata = { title: "Outbox" };
 const KIND: Record<string, string> = {
   CANDIDATE_INVITE: "Interview invite",
   CANDIDATE_REJECTION: "Rejection",
+  CANDIDATE_INTERVIEW_LINK: "Interview booking link",
+  CANDIDATE_INTERVIEW_CONFIRMED: "Interview confirmed",
+  CANDIDATE_INTERVIEW_CANCELLED: "Interview cancelled",
+  CANDIDATE_OFFER: "Offer",
+  CANDIDATE_OFFER_WITHDRAWN: "Offer withdrawn",
   INVITE_MEMBER: "Team invite",
 };
 
