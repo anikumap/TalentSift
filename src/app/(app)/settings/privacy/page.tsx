@@ -32,7 +32,7 @@ export default async function PrivacyPage() {
               <li>Emails sent to those candidates from the Outbox.</li>
             </ul>
             <p className="mt-2 text-sm text-ink-3">
-              Kept: the audit log (it records IDs, stages and scores, never names or answers), jobs, scorecards and your team. A
+              Kept: the audit log (IDs, stages, scores and reason codes; free-text decision notes about erased candidates are removed), jobs, scorecards and your team. A
               daily job erases expired data automatically; changes to the period apply from its next run.
             </p>
           </div>

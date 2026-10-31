@@ -1,5 +1,5 @@
 /**
- * Demo data: one org, two open jobs, ~12 scored candidates.
+ * Demo data: one org, two open jobs, ~12 scored candidates with a few weeks of decisions.
  * Run with `npm run seed`. Re-running replaces only the demo organisation.
  */
 import { db } from "../src/lib/db";
@@ -77,6 +77,23 @@ const WAREHOUSE_ANSWERS = [
   ],
 ];
 
+type SelfId = { gender?: "woman" | "man"; age?: "18_24" | "25_34" | "35_44" | "45_54"; disability?: "yes" | "no" };
+/** Voluntary self-ID for the demo, so the fairness monitor has something to show. Some people skip questions. */
+const SELF_IDS: SelfId[] = [
+  { gender: "woman", age: "35_44", disability: "no" },
+  { gender: "man", age: "25_34", disability: "no" },
+  { gender: "woman", age: "45_54" },
+  { gender: "man", age: "25_34", disability: "no" },
+  { gender: "woman", age: "18_24", disability: "no" },
+  { gender: "man", disability: "yes" },
+  { gender: "woman", age: "25_34", disability: "no" },
+  { gender: "man", age: "35_44", disability: "no" },
+  { gender: "woman", age: "35_44", disability: "yes" },
+  { gender: "man", age: "18_24", disability: "no" },
+  { gender: "woman", age: "25_34" },
+  { gender: "man", age: "45_54", disability: "no" },
+];
+
 const NAMES = ["Meena Iyer", "Ravi Kumar", "Sunita Das", "Arjun Nair", "Fatima Shaikh", "Joseph Mathew", "Pooja Rane", "Imran Khan", "Lakshmi Reddy", "Deepak Yadav", "Anita Pillai", "Suresh Patil"];
 
 async function apply(slug: string, answers: string[], i: number, missMustHaves = false) {
@@ -90,6 +107,7 @@ async function apply(slug: string, answers: string[], i: number, missMustHaves =
     city: ["Pune", "Mumbai", "Bengaluru", "Chennai"][i % 4],
     mustHaveAnswers: Object.fromEntries((job.scorecard?.mustHaves ?? []).map((m, k) => [m.id, !(missMustHaves && k === 0)])),
     answers: Object.fromEntries(job.questions.map((q, k) => [q.id, answers[k] ?? ""])),
+    selfId: SELF_IDS[i % SELF_IDS.length],
   });
 }
 
@@ -130,15 +148,32 @@ async function main() {
   for (const [i, answers] of CAREGIVER_ANSWERS.entries()) await apply(cg.slug, answers, i, i === 4);
   for (const [i, answers] of WAREHOUSE_ANSWERS.entries()) await apply(wh.slug, answers, i + 6, i === 2);
 
-  // A couple of decisions so the pipeline and audit log have history.
-  const top = await db.application.findFirstOrThrow({ where: { jobId: caregiver }, orderBy: { totalScore: "desc" } });
-  await changeStage(admin, top.id, "SHORTLISTED");
-  const low = await db.application.findFirstOrThrow({ where: { jobId: warehouse }, orderBy: { totalScore: "asc" } });
-  await changeStage(admin, low.id, "REJECTED", { code: "Lower skill evidence than other candidates" });
+  // Decisions on both jobs so the pipeline, analytics and fairness monitor have history.
+  const ranked = async (jobId: string) => db.application.findMany({ where: { jobId }, orderBy: { totalScore: "desc" } });
+  const [cgApps, whApps] = [await ranked(caregiver), await ranked(warehouse)];
+  await changeStage(admin, cgApps[0].id, "SHORTLISTED");
+  await changeStage(admin, cgApps[0].id, "INTERVIEW");
+  await changeStage(admin, cgApps[1].id, "SHORTLISTED");
+  await changeStage(admin, whApps[0].id, "SHORTLISTED");
+  await changeStage(admin, whApps[1].id, "SHORTLISTED");
+  await changeStage(admin, cgApps.at(-1)!.id, "REJECTED", { code: "Does not meet must-have" });
+  await changeStage(admin, whApps.at(-1)!.id, "REJECTED", { code: "Lower skill evidence than other candidates" });
+  await changeStage(admin, whApps.at(-2)!.id, "REJECTED", { code: "Lower skill evidence than other candidates" });
 
-  // Age two applications so "waiting on you" has something to show.
-  const waiting = await db.application.findMany({ where: { stage: "APPLIED" }, take: 2 });
-  for (const w of waiting) await db.application.update({ where: { id: w.id }, data: { createdAt: new Date(Date.now() - 3 * 86_400_000) } });
+  // Spread history over the last few weeks: applications 8-19 days ago, decisions a few days after each.
+  const DAY = 86_400_000;
+  const all = [...cgApps, ...whApps];
+  for (const [i, app] of all.entries()) {
+    const submitted = new Date(Date.now() - (8 + i) * DAY);
+    await db.$executeRaw`UPDATE "Application" SET "createdAt" = ${submitted}, "updatedAt" = ${submitted} WHERE "id" = ${app.id}`;
+    await db.$executeRaw`UPDATE "Candidate" SET "createdAt" = ${submitted} WHERE "id" = ${app.candidateId}`;
+    const events = await db.auditEvent.findMany({ where: { entityId: app.id }, orderBy: { createdAt: "asc" } });
+    for (const [k, ev] of events.entries()) {
+      const at = ev.action === "STAGE_CHANGED" || ev.action === "IDENTITY_REVEALED" ? new Date(submitted.getTime() + (1 + (i % 3) + k) * DAY) : submitted;
+      await db.$executeRaw`UPDATE "AuditEvent" SET "createdAt" = ${at} WHERE "id" = ${ev.id}`;
+      if (ev.action === "STAGE_CHANGED") await db.$executeRaw`UPDATE "Application" SET "updatedAt" = ${at} WHERE "id" = ${app.id}`;
+    }
+  }
 
   const count = await db.application.count({ where: { job: { orgId: admin.orgId } } });
   console.log(`Seeded demo org with 2 open jobs and ${count} candidates.`);
