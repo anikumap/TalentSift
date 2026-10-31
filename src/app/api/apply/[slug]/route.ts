@@ -42,6 +42,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
       city: String(form.get("city") ?? ""),
       mustHaveAnswers: parseJson<Record<string, boolean>>(form.get("mustHaveAnswers"), {}),
       answers: parseJson<Record<string, string>>(form.get("answers"), {}),
+      selfId: parseJson<Record<string, string>>(form.get("selfId"), {}),
       resume,
     } as Parameters<typeof submitApplication>[1]);
     return NextResponse.json({ publicRef });

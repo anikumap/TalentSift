@@ -33,3 +33,92 @@ export function rejectionEmail(name: string, jobTitle: string, orgName: string):
     ].join("\n"),
   };
 }
+
+export function bookingLinkEmail(name: string, jobTitle: string, orgName: string, url: string | null): Email {
+  const first = name.split(" ")[0];
+  return {
+    subject: url ? `Choose a time for your ${jobTitle} interview` : `Your ${jobTitle} interview at ${orgName}`,
+    body: [
+      `Hi ${first},`,
+      "",
+      `We'd like to meet you for the ${jobTitle} role at ${orgName}.`,
+      "",
+      ...(url
+        ? ["Please choose a time that suits you here:", url, "", "You can change or cancel it from the same link up to 12 hours before."]
+        : ["Someone from our team will call you within 2 working days to fix a time that suits you."]),
+      "",
+      `— The ${orgName} hiring team`,
+    ].join("\n"),
+  };
+}
+
+export function interviewConfirmedEmail(name: string, jobTitle: string, orgName: string, when: string, mode: string, location: string): Email {
+  const first = name.split(" ")[0];
+  return {
+    subject: `Interview confirmed: ${when}`,
+    body: [
+      `Hi ${first},`,
+      "",
+      `Your interview for the ${jobTitle} role at ${orgName} is booked.`,
+      "",
+      `When: ${when} (India time)`,
+      `How: ${mode}`,
+      `Where: ${location}`,
+      "",
+      "If you need to change the time, use the link from our earlier email, or reply to this one.",
+      "",
+      `— The ${orgName} hiring team`,
+    ].join("\n"),
+  };
+}
+
+export function interviewCancelledEmail(name: string, jobTitle: string, orgName: string): Email {
+  const first = name.split(" ")[0];
+  return {
+    subject: `Your ${jobTitle} interview time was cancelled`,
+    body: [
+      `Hi ${first},`,
+      "",
+      `Your interview time for the ${jobTitle} role at ${orgName} has been cancelled. Your application is still open.`,
+      "",
+      "If you have a booking link you can choose a new time from it; otherwise someone from our team will be in touch.",
+      "",
+      `— The ${orgName} hiring team`,
+    ].join("\n"),
+  };
+}
+
+export function offerEmail(name: string, jobTitle: string, orgName: string, url: string, respondBy: string): Email {
+  const first = name.split(" ")[0];
+  return {
+    subject: `Your offer for ${jobTitle} at ${orgName}`,
+    body: [
+      `Hi ${first},`,
+      "",
+      `We're happy to offer you the ${jobTitle} role at ${orgName}.`,
+      "",
+      "Read the offer letter and accept or decline it here:",
+      url,
+      "",
+      `Please reply by ${respondBy}. If you have questions, reply to this email before you decide.`,
+      "",
+      `— The ${orgName} hiring team`,
+    ].join("\n"),
+  };
+}
+
+export function offerWithdrawnEmail(name: string, jobTitle: string, orgName: string): Email {
+  const first = name.split(" ")[0];
+  return {
+    subject: `An update on your ${jobTitle} offer`,
+    body: [
+      `Hi ${first},`,
+      "",
+      `We're sorry to tell you that we have withdrawn our offer for the ${jobTitle} role at ${orgName}. The link in our earlier email no longer works.`,
+      "",
+      "This isn't a reflection on you, and we're grateful for the time you gave us. If you'd like to talk about it, please reply to this email.",
+      "",
+      `— The ${orgName} hiring team`,
+    ].join("\n"),
+  };
+}

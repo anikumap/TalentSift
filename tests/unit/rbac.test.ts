@@ -15,6 +15,19 @@ describe("rbac", () => {
     expect(can("INTERVIEWER", "candidate.view")).toBe(true);
   });
 
+  it("limits the fairness monitor to admins and recruiters", () => {
+    expect(can("ADMIN", "fairness.view")).toBe(true);
+    expect(can("RECRUITER", "fairness.view")).toBe(true);
+    expect(can("HIRING_MANAGER", "fairness.view")).toBe(false);
+    expect(can("INTERVIEWER", "fairness.view")).toBe(false);
+  });
+
+  it("lets everyone see interviews but only deciders manage them", () => {
+    for (const r of ["ADMIN", "RECRUITER", "HIRING_MANAGER", "INTERVIEWER"] as const) expect(can(r, "interview.view")).toBe(true);
+    expect(can("INTERVIEWER", "interview.manage")).toBe(false);
+    for (const r of ["ADMIN", "RECRUITER", "HIRING_MANAGER"] as const) expect(can(r, "interview.manage")).toBe(true);
+  });
+
   it("throws a FORBIDDEN AppError when not allowed", () => {
     const actor = { id: "u", orgId: "o", role: "INTERVIEWER" as const, name: "I" };
     try {

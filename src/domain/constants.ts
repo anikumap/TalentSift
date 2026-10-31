@@ -68,5 +68,36 @@ export const AUDIT_ACTIONS = [
   "IDENTITY_REVEALED",
   "MEMBER_INVITED",
   "PLAN_CHANGED",
+  "RETENTION_CHANGED",
+  "RETENTION_PURGE",
+  "INTERVIEW_SLOTS_ADDED",
+  "INTERVIEW_BOOKED",
+  "INTERVIEW_CANCELLED",
+  "INTERVIEW_STATUS_CHANGED",
+  "FEEDBACK_SUBMITTED",
+  "OFFER_SENT",
+  "OFFER_RESPONDED",
+  "OFFER_WITHDRAWN",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+export const INTERVIEW_MODES = ["IN_PERSON", "PHONE", "VIDEO"] as const;
+export type InterviewMode = (typeof INTERVIEW_MODES)[number];
+export const INTERVIEW_MODE_LABELS: Record<InterviewMode, string> = { IN_PERSON: "In person", PHONE: "Phone call", VIDEO: "Video call" };
+
+export const INTERVIEW_STATUSES = ["SCHEDULED", "CANCELLED", "COMPLETED", "NO_SHOW"] as const;
+export type InterviewStatus = (typeof INTERVIEW_STATUSES)[number];
+export const INTERVIEW_STATUS_LABELS: Record<InterviewStatus, string> = {
+  SCHEDULED: "Scheduled",
+  CANCELLED: "Cancelled",
+  COMPLETED: "Completed",
+  NO_SHOW: "Didn't attend",
+};
+
+export const RECOMMENDATIONS = ["STRONG_YES", "YES", "NO", "STRONG_NO"] as const;
+export type Recommendation = (typeof RECOMMENDATIONS)[number];
+export const RECOMMENDATION_LABELS: Record<Recommendation, string> = { STRONG_YES: "Strong yes", YES: "Yes", NO: "No", STRONG_NO: "Strong no" };
+
+export const OFFER_STATUSES = ["SENT", "ACCEPTED", "DECLINED", "WITHDRAWN"] as const;
+export type OfferStatus = (typeof OFFER_STATUSES)[number];
+export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = { SENT: "Sent", ACCEPTED: "Accepted", DECLINED: "Declined", WITHDRAWN: "Withdrawn" };

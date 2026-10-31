@@ -8,6 +8,15 @@ import { getApplicationDetail } from "@/services/applications";
 import { Badge, Notice, ScoreMeter, StageBadge, TotalScore } from "@/components/ui";
 import { DecisionButtons } from "@/components/candidates/DecisionButtons";
 import { RetryButton } from "@/components/candidates/RetryButton";
+import { InterviewsPanel } from "@/components/candidates/InterviewsPanel";
+import { FeedbackPanel } from "@/components/candidates/FeedbackPanel";
+import { listInterviewsForApp, listOpenSlots } from "@/services/interviews";
+import { getFeedback } from "@/services/feedback";
+import { OfferPanel } from "@/components/candidates/OfferPanel";
+import { getOffersForApp } from "@/services/offers";
+import { getJob } from "@/services/jobs";
+import { istDayKey } from "@/domain/interviews";
+import type { InterviewStatus } from "@/domain/constants";
 
 export const metadata = { title: "Candidate" };
 
@@ -18,6 +27,18 @@ export default async function CandidatePage({ params }: { params: Promise<{ appI
     if (e instanceof AppError && e.code === "NOT_FOUND") notFound();
     throw e;
   });
+  const manage = can(actor.role, "interview.manage");
+  const atInterview = app.stage === "INTERVIEW";
+  const [interviews, openSlots, feedback, offers, job] = await Promise.all([
+    listInterviewsForApp(actor, app.appId),
+    manage && atInterview ? listOpenSlots(actor, app.jobId) : Promise.resolve([]),
+    getFeedback(actor, app.appId),
+    getOffersForApp(actor, app.appId),
+    manage ? getJob(actor, app.jobId) : Promise.resolve(null),
+  ]);
+  const showOffer = manage && job && (offers.length > 0 || app.stage === "INTERVIEW" || app.stage === "OFFER");
+  const now = Date.now();
+  const showFeedback = feedback.visible.length > 0 || feedback.hiddenCount > 0 || feedback.mineDue.length > 0;
 
   return (
     <>
@@ -36,7 +57,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ appI
 
       {can(actor.role, "stage.change") && (
         <div className="mt-4">
-          <DecisionButtons appId={app.appId} jobId={app.jobId} stage={app.stage} />
+          <DecisionButtons appId={app.appId} jobId={app.jobId} stage={app.stage} offerPanel={manage} />
         </div>
       )}
 
@@ -86,6 +107,20 @@ export default async function CandidatePage({ params }: { params: Promise<{ appI
             )}
           </section>
 
+          {showFeedback && (
+            <FeedbackPanel
+              appId={app.appId}
+              actorId={actor.id}
+              skills={feedback.skills}
+              graderScores={app.evalStatus === "DONE" ? Object.fromEntries(app.skills.map((s) => [s.skillId, s.score])) : {}}
+              mineDue={interviews
+                .filter((i) => feedback.mineDue.includes(i.interviewId))
+                .map((i) => ({ interviewId: i.interviewId, startsAt: i.startsAt.toISOString() }))}
+              visible={feedback.visible.map((v) => ({ ...v, startsAt: v.startsAt.toISOString() }))}
+              hiddenCount={feedback.hiddenCount}
+            />
+          )}
+
           <section aria-labelledby="ans-h">
             <h2 id="ans-h" className="text-lg font-semibold">Answers</h2>
             <ol className="mt-3 space-y-4">
@@ -100,6 +135,44 @@ export default async function CandidatePage({ params }: { params: Promise<{ appI
         </div>
 
         <aside className="space-y-6">
+          {showOffer && (
+            <OfferPanel
+              appId={app.appId}
+              stage={app.stage}
+              offers={offers.map((o) => ({
+                id: o.id,
+                monthlyPay: o.monthlyPay,
+                startDate: o.startDate.toISOString(),
+                respondBy: o.respondBy.toISOString(),
+                status: o.status,
+                signedName: o.signedName,
+                declineReason: o.declineReason,
+                expired: o.expired,
+              }))}
+              payMin={job.payMin}
+              payMax={job.payMax}
+              today={istDayKey(new Date(now))}
+              tomorrow={istDayKey(new Date(now + 86_400_000))}
+              inAWeek={istDayKey(new Date(now + 7 * 86_400_000))}
+            />
+          )}
+          {(interviews.length > 0 || atInterview) && (
+            <InterviewsPanel
+              appId={app.appId}
+              atInterview={atInterview}
+              manage={manage}
+              interviews={interviews.map((i) => ({
+                interviewId: i.interviewId,
+                startsAt: i.startsAt.toISOString(),
+                durationMin: i.durationMin,
+                mode: i.mode,
+                location: i.location,
+                status: i.status as InterviewStatus,
+                interviewerName: i.interviewerName,
+              }))}
+              openSlots={openSlots.map((s) => ({ id: s.id, startsAt: s.startsAt.toISOString(), mode: s.mode }))}
+            />
+          )}
           <section className="panel p-4" aria-labelledby="contact-h">
             <h2 id="contact-h" className="font-semibold">Contact</h2>
             {app.contact ? (

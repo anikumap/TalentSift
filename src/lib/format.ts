@@ -32,6 +32,14 @@ const ACTION_TEXT: Record<string, string> = {
   IDENTITY_REVEALED: "revealed a candidate's identity",
   MEMBER_INVITED: "invited a team member",
   PLAN_CHANGED: "changed the plan",
+  INTERVIEW_SLOTS_ADDED: "added interview times",
+  INTERVIEW_BOOKED: "booked an interview",
+  INTERVIEW_CANCELLED: "cancelled an interview",
+  INTERVIEW_STATUS_CHANGED: "closed an interview",
+  FEEDBACK_SUBMITTED: "submitted interview feedback",
+  OFFER_SENT: "sent an offer",
+  OFFER_RESPONDED: "answered an offer",
+  OFFER_WITHDRAWN: "withdrew an offer",
 };
 
 export function describeAudit(e: { action: string; actorName: string | null; before: string | null; after: string | null }): string {

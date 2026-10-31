@@ -12,18 +12,22 @@ export function DecisionButtons({
   jobId,
   stage,
   compact = false,
+  offerPanel = false,
 }: {
   appId: string;
   jobId: string;
   stage: Stage;
   compact?: boolean;
+  /** The page has an Offer panel, which owns the move to Offer (send an offer) and to Hired (after acceptance). */
+  offerPanel?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string>();
   const dialog = useRef<HTMLDialogElement>(null);
   if (isFinal(stage)) return null;
 
-  const advanceTo = stage === "ON_HOLD" ? "SHORTLISTED" : nextStage(stage);
+  const next = stage === "ON_HOLD" ? "SHORTLISTED" : nextStage(stage);
+  const advanceTo = offerPanel && (next === "OFFER" || next === "HIRED") ? null : next;
   const run = (to: Stage, reason?: { code: RejectReason; note?: string }) =>
     start(async () => {
       const r = await changeStageAction(appId, jobId, to, reason);
