@@ -18,6 +18,8 @@ const ACTION_LABELS: Record<string, string> = {
   IDENTITY_REVEALED: "Identity revealed",
   MEMBER_INVITED: "Member invited",
   PLAN_CHANGED: "Plan changed",
+  RETENTION_CHANGED: "Retention changed",
+  RETENTION_PURGE: "Old candidate data erased",
 };
 
 function summarize(json: string | null): string {

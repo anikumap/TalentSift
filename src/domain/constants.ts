@@ -68,5 +68,7 @@ export const AUDIT_ACTIONS = [
   "IDENTITY_REVEALED",
   "MEMBER_INVITED",
   "PLAN_CHANGED",
+  "RETENTION_CHANGED",
+  "RETENTION_PURGE",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
