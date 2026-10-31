@@ -50,8 +50,8 @@ function mustHavesFromText(text: string): MustHaveDraft[] {
 
 /** Deterministic stand-in for Claude. Same input always gives the same output. */
 export class MockAIProvider implements AIProvider {
-  readonly model = "mock-ai";
-  readonly promptVersion = "mock-v1";
+  readonly model: string = "mock-ai";
+  readonly promptVersion: string = "mock-v1";
 
   async generateScorecard(intake: IntakeAnswers): Promise<ScorecardDraft> {
     const template = TEMPLATES.find((t) => t.match.test(intake.title));

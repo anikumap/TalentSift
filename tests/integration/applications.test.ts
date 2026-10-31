@@ -66,7 +66,7 @@ describe("applications service", () => {
     const app = await db.application.findFirstOrThrow({ include: { evaluations: true } });
     expect(app.evalStatus).toBe("DONE");
     expect(app.evaluations).toHaveLength(job.skills.length);
-    expect(app.evaluations.every((e) => e.model === "mock-ai" && e.promptVersion === "mock-v1")).toBe(true);
+    expect(app.evaluations.every((e) => e.model === "rules" && e.promptVersion === "rules-v1")).toBe(true);
     expect(app.totalScore).toBeGreaterThan(0);
     expect(await db.auditEvent.count({ where: { action: "APPLICATION_SUBMITTED" } })).toBe(1);
     expect(await db.auditEvent.count({ where: { action: "EVALUATION_CREATED" } })).toBe(1);

@@ -12,7 +12,7 @@ export default defineConfig({
   resolve: { alias: { "@": path.resolve(import.meta.dirname, "src") } },
   test: {
     env: testEnv,
-    include: ["tests/unit/**/*.test.ts", "tests/integration/**/*.test.ts"],
+    include: ["tests/unit/**/*.test.ts", "tests/integration/**/*.test.ts", "tests/benchmark/**/*.test.ts"],
     globalSetup: ["tests/setup/global.ts"],
     pool: "forks",
     maxWorkers: 1,

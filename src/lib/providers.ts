@@ -1,4 +1,4 @@
-import { MockAIProvider } from "@/providers/ai/mock";
+import { RuleBasedAIProvider } from "@/providers/ai/rule-based";
 import { MockBillingProvider } from "@/providers/billing/mock";
 import { MockEmailProvider } from "@/providers/email/mock";
 import type { AIProvider, BillingProvider, EmailProvider } from "@/providers/types";
@@ -6,7 +6,7 @@ import type { AIProvider, BillingProvider, EmailProvider } from "@/providers/typ
 type Providers = { ai: AIProvider; email: EmailProvider; billing: BillingProvider };
 
 const defaults = (): Providers => ({
-  ai: new MockAIProvider(),
+  ai: new RuleBasedAIProvider(),
   email: new MockEmailProvider(),
   billing: new MockBillingProvider(),
 });
