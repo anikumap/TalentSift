@@ -32,6 +32,7 @@ model User {
   role         String
   createdAt    DateTime     @default(now())
   sessions     Session[]
+  slots        InterviewSlot[]
 }
 
 model Session {
@@ -74,6 +75,7 @@ model Job {
   questions    WorkSampleQuestion[]
   applications Application[]
   jobCredits   JobCredit[]
+  slots        InterviewSlot[]
 }
 
 model Scorecard {
@@ -148,6 +150,9 @@ model Application {
   updatedAt       DateTime     @updatedAt
   evaluations     Evaluation[]
   selfId          SelfId?
+  interviews      Interview[]
+  links           CandidateLink[]
+  offers          Offer[]
 
   @@unique([jobId, publicRef])
   @@unique([jobId, candidateId])
@@ -224,4 +229,82 @@ model JobCredit {
   job       Job?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
   expiresAt DateTime
   createdAt DateTime     @default(now())
+}
+
+/// A bookable interview time. One interviewer, one candidate.
+model InterviewSlot {
+  id            String     @id @default(cuid())
+  jobId         String
+  job           Job        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  interviewerId String
+  interviewer   User       @relation(fields: [interviewerId], references: [id], onDelete: Cascade)
+  startsAt      DateTime
+  durationMin   Int
+  mode          String
+  location      String
+  createdAt     DateTime   @default(now())
+  interview     Interview?
+
+  @@index([jobId, startsAt])
+}
+
+model Interview {
+  id            String         @id @default(cuid())
+  applicationId String
+  application   Application    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  /// Null once cancelled, which frees the slot. Unique, so a slot can't be double-booked.
+  slotId        String?        @unique
+  slot          InterviewSlot? @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  interviewerId String
+  startsAt      DateTime
+  durationMin   Int
+  mode          String
+  location      String
+  status        String         @default("SCHEDULED")
+  bookedBy      String
+  createdAt     DateTime       @default(now())
+  feedback      Feedback?
+
+  @@index([interviewerId, startsAt])
+}
+
+model Feedback {
+  id             String    @id @default(cuid())
+  interviewId    String    @unique
+  interview      Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  interviewerId  String
+  /// JSON [{ skillId, name, rating }]: names are snapshotted so removed skills still read.
+  ratings        String
+  recommendation String
+  notes          String
+  createdAt      DateTime  @default(now())
+}
+
+/// Token links that let a candidate act without an account. Reissuing replaces the old link.
+model CandidateLink {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  purpose       String
+  tokenHash     String      @unique
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+
+  @@unique([applicationId, purpose])
+}
+
+model Offer {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  monthlyPay    Int
+  startDate     DateTime
+  respondBy     DateTime
+  terms         String
+  status        String      @default("SENT")
+  signedName    String?
+  declineReason String?
+  respondedAt   DateTime?
+  createdAt     DateTime    @default(now())
+  createdById   String
 }

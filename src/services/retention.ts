@@ -9,6 +9,8 @@ import { audit } from "./audit";
 export type PurgeResult = { orgId: string; candidates: number; applications: number; messages: number; cutoff: Date };
 
 type Org = { id: string; retentionDays: number };
+/** Audit actions whose reason can hold recruiter free text about the candidate. */
+const NOTE_ACTIONS = ["STAGE_CHANGED", "OFFER_WITHDRAWN", "INTERVIEW_CANCELLED"];
 type Client = Prisma.TransactionClient | typeof db;
 
 /** Candidates with no application touched since the cutoff. */
@@ -46,7 +48,7 @@ async function purgeOrg(org: Org, now: Date, actor?: Actor): Promise<PurgeResult
     // recruiter free text that may name the person, so only the reason code is kept.
     const appIds = (await tx.application.findMany({ where: { candidateId: { in: ids } }, select: { id: true } })).map((a) => a.id);
     const noted = appIds.length
-      ? await tx.auditEvent.findMany({ where: { action: "STAGE_CHANGED", entityId: { in: appIds }, reason: { not: null } }, select: { id: true, reason: true } })
+      ? await tx.auditEvent.findMany({ where: { action: { in: NOTE_ACTIONS }, entityId: { in: appIds }, reason: { not: null } }, select: { id: true, reason: true } })
       : [];
     for (const ev of noted) {
       const stripped = stripNote(ev.reason, REJECT_REASONS);

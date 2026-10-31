@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 import { AppError } from "@/lib/errors";
@@ -16,6 +17,30 @@ const reasonSchema = z.object({
 
 /** Stages after which the reviewer has decided to engage with the person, so identity is shown. */
 const REVEAL_AT: Stage[] = ["SHORTLISTED", "INTERVIEW", "OFFER", "HIRED"];
+
+type StageApp = { id: string; jobId: string; stage: string; revealed: boolean };
+
+/**
+ * Moves an application to `toStage` inside the caller's transaction, with its audit rows.
+ * Every stage change goes through here so offers and bookings stay atomic with it.
+ */
+export async function applyStageChange(
+  tx: Prisma.TransactionClient,
+  actor: Actor,
+  app: StageApp,
+  toStage: Stage,
+  reasonText: string | null,
+): Promise<void> {
+  const from = app.stage as Stage;
+  if (!canTransition(from, toStage)) {
+    throw new AppError("VALIDATION", `Can't move from ${STAGE_LABELS[from]} to ${STAGE_LABELS[toStage]}.`);
+  }
+  const reveal = !app.revealed && REVEAL_AT.includes(toStage);
+  const base = { orgId: actor.orgId, actorId: actor.id, actorName: actor.name, entityType: "Application", entityId: app.id, jobId: app.jobId };
+  await tx.application.update({ where: { id: app.id }, data: { stage: toStage, ...(reveal ? { revealed: true } : {}) } });
+  await audit(tx, { ...base, action: "STAGE_CHANGED", reason: reasonText, before: { stage: from }, after: { stage: toStage } });
+  if (reveal) await audit(tx, { ...base, action: "IDENTITY_REVEALED", reason: `Advanced to ${STAGE_LABELS[toStage]}` });
+}
 
 /** The only way an application changes stage. Always a human actor; always audited. */
 export async function changeStage(
@@ -47,14 +72,7 @@ export async function changeStage(
     reasonText = reason.note.slice(0, 500);
   }
 
-  const reveal = !app.revealed && REVEAL_AT.includes(toStage);
-  const base = { orgId: actor.orgId, actorId: actor.id, actorName: actor.name, entityType: "Application", entityId: appId, jobId: app.jobId };
-
-  await db.$transaction(async (tx) => {
-    await tx.application.update({ where: { id: appId }, data: { stage: toStage, ...(reveal ? { revealed: true } : {}) } });
-    await audit(tx, { ...base, action: "STAGE_CHANGED", reason: reasonText, before: { stage: from }, after: { stage: toStage } });
-    if (reveal) await audit(tx, { ...base, action: "IDENTITY_REVEALED", reason: `Advanced to ${STAGE_LABELS[toStage]}` });
-  });
+  await db.$transaction((tx) => applyStageChange(tx, actor, app, toStage, reasonText));
 
   const name = decrypt(app.candidate.nameEnc);
   const to = decrypt(app.candidate.emailEnc);

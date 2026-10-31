@@ -120,6 +120,19 @@ describe("retention service", () => {
     expect(JSON.stringify(all)).not.toMatch(/Meena|Nagpur/);
   });
 
+  it("strips free-text reasons from offer and interview audit events of erased candidates", async () => {
+    const app = await applyAged(job, "old@x.com", 400);
+    for (const action of ["OFFER_WITHDRAWN", "INTERVIEW_CANCELLED"] as const) {
+      await db.auditEvent.create({
+        data: { orgId: admin.orgId, actorName: "Asha", action, entityType: "Application", entityId: app.id, reason: "Budget cut for Meena" },
+      });
+    }
+    await purgeExpired(NOW);
+    const evs = await db.auditEvent.findMany({ where: { entityId: app.id, action: { in: ["OFFER_WITHDRAWN", "INTERVIEW_CANCELLED"] } } });
+    expect(evs).toHaveLength(2);
+    expect(evs.every((e) => e.reason === null)).toBe(true);
+  });
+
   it("erases nothing and writes nothing on a second run", async () => {
     await applyAged(job, "old@x.com", 400);
     await purgeExpired(NOW);

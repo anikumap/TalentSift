@@ -5,6 +5,7 @@ const testEnv = {
   DATABASE_URL: "file:./test.db",
   ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
   APP_URL: "http://localhost:3000",
+  TZ: "UTC",
 };
 Object.assign(process.env, testEnv);
 
